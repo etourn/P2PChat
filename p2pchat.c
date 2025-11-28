@@ -24,14 +24,34 @@ typedef struct{
 int peers[CAPACITY];
 int num_peers=0;
 
-// TODO: fix this
+// TODO: need to implement write_helper to write all bytes (similar to read_helper)
+
+// TODO: fix this (fixed?)
 // Broadcast message
 void broadcast(int unique_fd, char* username, char* message){
-  for (int i=0; i<num_peers; i++){
-    // check to make sure were not sending to ourselves
-    write(peers[i], username, strlen(username));
-    write(peers[i], message, strlen(message));
+  size_t ulen = strlen(username);
+  size_t mlen = strlen(message);
+
+  pthread_mutex_lock(&peers_lock);
+  for (int i = 0; i < num_peers; i++) {
+    int fd = peers[i];
+    if (fd == unique_fd) {
+      continue; // don't send back to sender
+    } 
+    if (write_helper(fd, &ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
+      continue;
+    }
+    if (write_helper(fd, username, ulen) != (ssize_t)ulen) {
+      continue;
+    }
+    if (write_helper(fd, &mlen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
+      continue;
+    }
+    if (write_helper(fd, message, mlen) != (ssize_t)mlen) {
+      continue;
+    }
   }
+  pthread_mutex_unlock(&peers_lock);
 }
 
 // Helper function to all the required bytes
