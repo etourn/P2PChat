@@ -13,6 +13,7 @@ const char* username;
 
 #define CAPACITY 1000
 #define MESSAGE_LEN 2048
+pthread_mutex_t peers_lock = PTHREAD_MUTEX_INITIALIZER;
 
 // Data structure to store all peers
 typedef struct{
@@ -84,17 +85,19 @@ void* peer_read_thread(void* arg) {
     // Read the full message
     read_helper(peer_fd, message, message_len);
     
-    ui_display(username, message)
-    broadcast(peer_fd, username, message);
+    ui_display(username, message);
+    // broadcast(peer_fd, username, message);
 
     free(username);
     free(message);
   }
+  return NULL;
 }
 
 // Thread for accepting incoming connection thread
 void* accept_thread(void* arg) {
   int server_fd = *(int*) arg;
+  free(arg);
   // Continuously accepting thread as long as the server is running
   while(1) {
     // Get the socket file descriptor 
@@ -102,16 +105,28 @@ void* accept_thread(void* arg) {
     // Skip if accept return an error
     if (peer_fd < 0)continue;
     
-    // Store peer
-    peers[num_peers++] = peer_fd;
+    // Add new peers to the global peer list
+    pthread_mutex_lock(&peers_lock);
+    if (num_peers < CAPACITY) {
+      // store peers
+      peers[num_peers++] = peer_fd;
+    } else {
+      // too many peers
+      close(peer_fd);
+      pthread_mutex_unlock(&peers_lock);
+      continue;
+    }
+    pthread_mutex_unlock(&peers_lock);
 
     pthread_t t;
     // Allocate memory to store the peer's socket fd
     int *fd_ptr = malloc(sizeof(int));
+    if (!fd_ptr) { close(peer_fd); continue; }
     *fd_ptr = peer_fd;
     // Create a read thread for each peer
     pthread_create(&t, NULL, peer_read_thread, fd_ptr);
   }
+  return NULL;
 }
 
     
