@@ -6,7 +6,9 @@
 #include <unistd.h>
 
 #include "socket.h"
+#include "writing.h"
 #include "ui.h"
+#include "reading.h"
 
 // Keep the username in a global so we can access it from the callback
 const char* username;
@@ -15,24 +17,16 @@ const char* username;
 #define MESSAGE_LEN 2048
 pthread_mutex_t peers_lock = PTHREAD_MUTEX_INITIALIZER;
 
-// Data structure to store all peers
-typedef struct{
-  int unique_fd;
-  char* username;
-}peer_identifier_t;
-
-peer_identifier_t peers[CAPACITY];
+// List of peers
+int peers[CAPACITY];
 int num_peers=0;
 
-// TODO: need to implement write_helper to write all bytes (similar to read_helper)
-
-// TODO: fix this (fixed?)
 // Broadcast message
 void broadcast(int unique_fd, char* username, char* message){
+  // get lengths of our data
   size_t ulen = strlen(username);
   size_t mlen = strlen(message);
 
-  pthread_mutex_lock(&peers_lock);
   for (int i = 0; i < num_peers; i++) {    
     if (write_helper(unique_fd, &ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
       continue;
@@ -47,19 +41,17 @@ void broadcast(int unique_fd, char* username, char* message){
       continue;
     }
   }
-  pthread_mutex_unlock(&peers_lock);
 }
 
 // Thread for accepting incoming connection thread
 void* accept_thread(void* arg) {
-  int server_fd = *(int*) arg;
-  free(arg);
+  int server_fd = (int) arg;
   // Continuously accepting thread as long as the server is running
   while(1) {
     // Get the socket file descriptor 
     int peer_fd = server_socket_accept(server_fd);
     // Skip if accept return an error
-    if (peer_fd < 0)continue;
+    if (peer_fd < 0) continue;
     
     // Add new peers to the global peer list
     pthread_mutex_lock(&peers_lock);
@@ -74,13 +66,9 @@ void* accept_thread(void* arg) {
     }
     pthread_mutex_unlock(&peers_lock);
 
-    pthread_t t;
-    // Allocate memory to store the peer's socket fd
-    int *fd_ptr = malloc(sizeof(int));
-    if (!fd_ptr) { close(peer_fd); continue; }
-    *fd_ptr = peer_fd;
     // Create a read thread for each peer
-    pthread_create(&t, NULL, peer_read_thread, fd_ptr);
+    pthread_t t;
+    pthread_create(&t, NULL, peer_read_thread, (void*) peer_fd);
   }
   return NULL;
 }
