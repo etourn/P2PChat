@@ -18,10 +18,10 @@ pthread_mutex_t peers_lock = PTHREAD_MUTEX_INITIALIZER;
 // Data structure to store all peers
 typedef struct{
   int unique_fd;
-  // char* username;
+  char* username;
 }peer_identifier_t;
 
-int peers[CAPACITY];
+peer_identifier_t peers[CAPACITY];
 int num_peers=0;
 
 // TODO: need to implement write_helper to write all bytes (similar to read_helper)
