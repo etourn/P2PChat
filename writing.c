@@ -1,4 +1,13 @@
 #include <sys/socket.h>
+#include <pthread.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "socket.h"
+#include "ui.h"
 
 // Helper function to write all the required bytes
 ssize_t write_helper(int fd, char* buf, size_t len) {

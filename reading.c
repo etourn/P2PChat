@@ -33,7 +33,7 @@ size_t read_helper(int fd, void* buf, size_t len) {
 
 // Thread to read both username and message. Recieve lengths first and then contents
 void* peer_read_thread(void* arg) {
-  int peer_fd = (int) arg;
+  intptr_t peer_fd = (intptr_t) arg;
 
   // Keep reading information from this peer
   while(1) {
