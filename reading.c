@@ -7,6 +7,7 @@
 
 #include "socket.h"
 #include "ui.h"
+#include "p2pchat.h"
 
 const char* username;
 
@@ -69,6 +70,7 @@ void* peer_read_thread(void* arg) {
     ui_display(username, message);
 
     /* Broadcast to all other peers */
+    broadcast(username, message);
 
     free(username);
     free(message);
