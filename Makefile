@@ -6,8 +6,8 @@ all: p2pchat
 clean:
 	rm -f p2pchat
 
-p2pchat: p2pchat.c ui.c ui.h
-	$(CC) $(CFLAGS) -o p2pchat p2pchat.c ui.c -lform -lncurses -lpthread
+p2pchat: p2pchat.c ui.c ui.h writing.h writing.c reading.c reading.h
+	$(CC) $(CFLAGS) -o p2pchat p2pchat.c ui.c writing.c reading.c -lform -lncurses -lpthread
 
 zip:
 	@echo "Generating p2pchat.zip file to submit to Gradescope..."

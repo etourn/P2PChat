@@ -18,38 +18,44 @@ const char* username;
 pthread_mutex_t peers_lock = PTHREAD_MUTEX_INITIALIZER;
 
 // List of peers
-int peers[CAPACITY];
+intptr_t peers[CAPACITY];
 int num_peers=0;
 
 // Broadcast message
 void broadcast(int unique_fd, char* username, char* message){
+
   // get lengths of our data
   size_t ulen = strlen(username);
   size_t mlen = strlen(message);
 
+  // Write to all peers
   for (int i = 0; i < num_peers; i++) {    
-    if (write_helper(unique_fd, &ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
-      continue;
+    if (write_helper(unique_fd, (char*) &ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
+      break;
+      fprintf(stderr, "Error transmitting over network\n");
     }
     if (write_helper(unique_fd, username, ulen) != (ssize_t)ulen) {
-      continue;
+      break;
+      fprintf(stderr, "Error transmitting over network\n");
     }
-    if (write_helper(unique_fd, &mlen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
-      continue;
+    if (write_helper(unique_fd, (char*) &mlen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
+      break;
+      fprintf(stderr, "Error transmitting over network\n");
     }
     if (write_helper(unique_fd, message, mlen) != (ssize_t)mlen) {
-      continue;
+      break;
+      fprintf(stderr, "Error transmitting over network\n");
     }
   }
 }
 
 // Thread for accepting incoming connection thread
 void* accept_thread(void* arg) {
-  int server_fd = (int) arg;
+  intptr_t server_fd = (intptr_t) arg;
   // Continuously accepting thread as long as the server is running
   while(1) {
     // Get the socket file descriptor 
-    int peer_fd = server_socket_accept(server_fd);
+    intptr_t peer_fd = server_socket_accept(server_fd);
     // Skip if accept return an error
     if (peer_fd < 0) continue;
     
