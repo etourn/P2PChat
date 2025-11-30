@@ -67,6 +67,7 @@ void* peer_read_thread(void* arg) {
     read_helper(peer_fd, message, message_len);
     
     ui_display(username, message);
+    broadcast(peer_fd, message, message_len);
 
     /* Broadcast to all other peers */
 
