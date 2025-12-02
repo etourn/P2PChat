@@ -9,8 +9,6 @@
 #include "ui.h"
 #include "p2pchat.h"
 
-const char* username;
-
 #define MESSAGE_LEN 2048
 
 // Helper function to all the required bytes
