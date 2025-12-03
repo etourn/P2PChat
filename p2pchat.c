@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
     intptr_t peer_port = atoi(argv[3]);
   
     // TODO: Connect to another peer in the chat network
-    int peer_fd;
+    intptr_t peer_fd;
     if ((peer_fd = socket_connect(peer_hostname, peer_port)) == -1) {
       perror("Connection fail");
       exit(EXIT_FAILURE);
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
     // add to peer list
     pthread_mutex_lock(&peers_lock); // lock when altering shared array
     peers[num_peers++] = peer_fd;
-    pthread_mutex_lock(&peers_lock); 
+    pthread_mutex_unlock(&peers_lock); 
 
     // Call reading thread
     pthread_t t;
