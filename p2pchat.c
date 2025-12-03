@@ -13,6 +13,7 @@
 #define CAPACITY 1000
 #define MESSAGE_LEN 2048
 pthread_mutex_t peers_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t seen_lock = PTHREAD_MUTEX_INITIALIZER;
 
 // Keep the username in a global so we can access it from the callback
 const char* username;
@@ -111,9 +112,14 @@ void input_callback(const char* message) {
   char message_id[64];
   snprintf(message_id, sizeof(message_id), "%s%d", username, count);
   // add to our own seen set
+  pthread_mutex_lock(&seen_lock);
   for (int i=0; i<CAPACITY; i++){
-    seen[i] = strdup(message_id);
+    if (seen[i] == NULL) {
+      seen[i] = strdup(message_id);  
+      break;
+    }
   }
+  pthread_mutex_unlock(&seen_lock);
   // Valid message broadcast to network
   broadcast(username, message, message_id);
 }

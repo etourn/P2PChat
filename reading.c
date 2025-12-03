@@ -13,6 +13,8 @@
 #define MESSAGE_LEN 2048
 #define CAPACITY 1000
 
+extern pthread_mutex_t seen_lock;
+
 // Helper function to all the required bytes
 size_t read_helper(int fd, void* buf, size_t len) {
   // Bytes read so far
@@ -101,12 +103,14 @@ void* peer_read_thread(void* arg) {
 
       // store message id
       // find a free slot and store
+      pthread_mutex_lock(&seen_lock);
       for (int i = 0; i < CAPACITY; i++) {
           if (seen[i] == NULL) {
               seen[i] = strdup(message_id);  
               break;
           }
       }
+      pthread_mutex_unlock(&seen_lock);
     }
 
     free(username);
