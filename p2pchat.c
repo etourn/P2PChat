@@ -126,6 +126,7 @@ void input_callback(const char *message)
   pthread_mutex_lock(&seen_lock);
   for (int i=0; i<CAPACITY; i++){
     if (seen[i] == NULL) {
+      // cite: https://man7.org/linux/man-pages/man3/strdup.3.html
       seen[i] = strdup(message_id);  
       break;
     }
@@ -157,6 +158,7 @@ int main(int argc, char **argv)
   }
 
   // start listening on our server
+  // cite: https://man7.org/linux/man-pages/man2/listen.2.html
   if (listen(server_socket_fd, SOMAXCONN) == -1) {
   perror("listen");
   exit(EXIT_FAILURE);
@@ -174,7 +176,8 @@ int main(int argc, char **argv)
     unsigned short peer_port = atoi(argv[3]);
 
     // TODO: Connect to another peer in the chat network
-    if (socket_connect(peer_hostname, peer_port) == -1)
+    intptr_t peer_fd;
+    if ((peer_fd = socket_connect(peer_hostname, peer_port)) == -1)
     {
       perror("Connection fail");
       exit(EXIT_FAILURE);
