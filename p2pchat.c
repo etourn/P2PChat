@@ -159,6 +159,11 @@ int main(int argc, char **argv)
   // each time the user hits enter to send a message.
   ui_init(input_callback);
 
+  // Display the port the server is listening on
+  char port_msg[64];
+  snprintf(port_msg, sizeof(port_msg), "Listening on port %d", port);
+  ui_display("INFO", port_msg);
+
   // Once the UI is running, you can use it to display log messages
   ui_display("INFO", "This is a handy log message.");
 
