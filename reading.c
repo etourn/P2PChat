@@ -37,11 +37,15 @@ void* peer_read_thread(void* arg) {
   // Keep reading information from this peer
   while(1) {
 
+    // Read the message id
+    if (read(peer_fd, &username_len, sizeof(size_t)) != sizeof(size_t)) {
+      break; // Stop reading if there's an error
+    }
+
     // Reading the username's length 
     size_t username_len;
     if (read(peer_fd, &username_len, sizeof(size_t)) != sizeof(size_t)) {
       break; // Stop reading if there's an error
-    }
 
     // Check if size is appropriate 
     if (username_len > MESSAGE_LEN) break;
@@ -74,4 +78,5 @@ void* peer_read_thread(void* arg) {
     free(message);
   }
   return NULL;
+  }
 }
