@@ -108,7 +108,13 @@ int main(int argc, char** argv) {
     exit(EXIT_FAILURE);
   }
 
-  // listening on our server
+  // start listening on our server
+  if (listen(server_socket_fd, SOMAXCONN) == -1) {
+  perror("listen");
+  exit(EXIT_FAILURE);
+}
+
+  // create thread to wait for connections
   pthread_t thread_id;
   pthread_create(&thread_id, NULL, accept_thread, (void*) server_socket_fd);
 
@@ -119,16 +125,20 @@ int main(int argc, char** argv) {
     intptr_t peer_port = atoi(argv[3]);
   
     // TODO: Connect to another peer in the chat network
-    if (socket_connect(peer_hostname, peer_port) == -1) {
+    int peer_fd;
+    if ((peer_fd = socket_connect(peer_hostname, peer_port)) == -1) {
       perror("Connection fail");
       exit(EXIT_FAILURE);
     }
 
     // add to peer list
-    peers[num_peers++] = peer_port;
+    pthread_mutex_lock(&peers_lock); // lock when altering shared array
+    peers[num_peers++] = peer_fd;
+    pthread_mutex_lock(&peers_lock); 
 
-    // Call listening thread
-    peer_read_thread((void*) peer_port);
+    // Call reading thread
+    pthread_t t;
+    pthread_create(&t, NULL, peer_read_thread, (void*)peer_fd);
   }
 
   // Set up the user interface. The input_callback function will be called
