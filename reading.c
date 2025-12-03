@@ -7,8 +7,7 @@
 
 #include "socket.h"
 #include "ui.h"
-
-const char* username;
+#include "p2pchat.h"
 
 #define MESSAGE_LEN 2048
 
@@ -70,6 +69,7 @@ void* peer_read_thread(void* arg) {
     broadcast(peer_fd, message, message_len);
 
     /* Broadcast to all other peers */
+    broadcast(username, message);
 
     free(username);
     free(message);

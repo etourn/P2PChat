@@ -22,37 +22,28 @@ intptr_t peers[CAPACITY];
 int num_peers = 0;
 
 // Broadcast message
-void broadcast(int unique_fd, char *username, char *message)
-{
+void broadcast(const char* username, const char* message){
 
   // get lengths of our data
   size_t ulen = strlen(username);
   size_t mlen = strlen(message);
 
   // Write to all peers
-  for (int i = 0; i < num_peers; i++)
-  {
-    if (peers[i] == unique_fd)
-      continue;
-
-    if (write_helper(peers[i], (char *)&ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t))
-    {
-      continue;
+  for (int i = 0; i < num_peers; i++) {    
+    if (write_helper(peers[i], (char*) &ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
+      break;
       fprintf(stderr, "Error transmitting over network\n");
     }
-    if (write_helper(peers[i], username, ulen) != (ssize_t)ulen)
-    {
-      continue;
+    if (write_helper(peers[i], username, ulen) != (ssize_t)ulen) {
+      break;
       fprintf(stderr, "Error transmitting over network\n");
     }
-    if (write_helper(peers[i], (char *)&mlen, sizeof(size_t)) != (ssize_t)sizeof(size_t))
-    {
-      continue;
+    if (write_helper(peers[i], (char*) &mlen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
+      break;
       fprintf(stderr, "Error transmitting over network\n");
     }
-    if (write_helper(peers[i], message, mlen) != (ssize_t)mlen)
-    {
-      continue;
+    if (write_helper(peers[i], message, mlen) != (ssize_t)mlen) {
+      break;
       fprintf(stderr, "Error transmitting over network\n");
     }
   }
@@ -104,8 +95,9 @@ void input_callback(const char *message)
   else
   {
     ui_display(username, message);
-  }
-  // TODO: construct a message and send it to everyone else
+  } 
+  // Valid message broadcast to network
+  broadcast(username, message);
 }
 
 int main(int argc, char **argv)
@@ -129,7 +121,13 @@ int main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
-  // listening on our server
+  // start listening on our server
+  if (listen(server_socket_fd, SOMAXCONN) == -1) {
+  perror("listen");
+  exit(EXIT_FAILURE);
+}
+
+  // create thread to wait for connections
   pthread_t thread_id;
   pthread_create(&thread_id, NULL, accept_thread, (void *)server_socket_fd);
 
@@ -147,8 +145,14 @@ int main(int argc, char **argv)
       exit(EXIT_FAILURE);
     }
 
-    // Call listening thread
-    // Send message out
+    // add to peer list
+    pthread_mutex_lock(&peers_lock); // lock when altering shared array
+    peers[num_peers++] = peer_fd;
+    pthread_mutex_unlock(&peers_lock); 
+
+    // Call reading thread
+    pthread_t t;
+    pthread_create(&t, NULL, peer_read_thread, (void*)peer_fd);
   }
 
   // Set up the user interface. The input_callback function will be called

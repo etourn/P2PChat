@@ -10,9 +10,9 @@
 #include "ui.h"
 
 // Helper function to write all the required bytes
-ssize_t write_helper(int fd, char* buf, size_t len) {
+ssize_t write_helper(int fd, const void* buf, size_t len) {
   size_t bytes_written = 0;
-  char* ptr = buf;
+  const char* ptr = buf;
 
   // write every element in the buffer
   while (bytes_written < len) {
@@ -22,4 +22,3 @@ ssize_t write_helper(int fd, char* buf, size_t len) {
   }
   return (ssize_t) bytes_written;
 }
-
