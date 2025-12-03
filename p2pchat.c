@@ -10,41 +10,54 @@
 #include "ui.h"
 #include "reading.h"
 
-// Keep the username in a global so we can access it from the callback
-const char* username;
-
 #define CAPACITY 1000
 #define MESSAGE_LEN 2048
 pthread_mutex_t peers_lock = PTHREAD_MUTEX_INITIALIZER;
+
+// Keep the username in a global so we can access it from the callback
+const char* username;
+// keep a count of messages sent for id
+int count = 0;
+// seen array
+char* seen[CAPACITY]; 
 
 // List of peers
 intptr_t peers[CAPACITY];
 int num_peers=0;
 
 // Broadcast message
-void broadcast(const char* username, const char* message){
+void broadcast(const char* username, const char* message, const char* message_id){
 
   // get lengths of our data
   size_t ulen = strlen(username);
   size_t mlen = strlen(message);
+  size_t milen = strlen(message_id);
 
   // Write to all peers
   for (int i = 0; i < num_peers; i++) {    
-    if (write_helper(peers[i], (char*) &ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
-      break;
+    if (write_helper(peers[i], (char*) &milen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
       fprintf(stderr, "Error transmitting over network\n");
+      break;
+    }
+    if (write_helper(peers[i], message_id, milen) != (ssize_t)milen) {
+      fprintf(stderr, "Error transmitting over network\n");
+      break;
+    }
+    if (write_helper(peers[i], (char*) &ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
+      fprintf(stderr, "Error transmitting over network\n");
+      break;
     }
     if (write_helper(peers[i], username, ulen) != (ssize_t)ulen) {
-      break;
       fprintf(stderr, "Error transmitting over network\n");
+      break;
     }
     if (write_helper(peers[i], (char*) &mlen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
-      break;
       fprintf(stderr, "Error transmitting over network\n");
+      break;
     }
     if (write_helper(peers[i], message, mlen) != (ssize_t)mlen) {
-      break;
       fprintf(stderr, "Error transmitting over network\n");
+      break;
     }
   }
 }
@@ -74,7 +87,11 @@ void* accept_thread(void* arg) {
 
     // Create a read thread for each peer
     pthread_t t;
-    pthread_create(&t, NULL, peer_read_thread, (void*) peer_fd);
+    // create struct peer to pass in args
+    peer* p = malloc(sizeof(*p));
+    p->peer_fd = peer_fd;
+    p->seen = seen;
+    pthread_create(&t, NULL, peer_read_thread, (void*) p);
   }
   return NULL;
 }
@@ -86,8 +103,19 @@ void input_callback(const char* message) {
   } else {
     ui_display(username, message);
   } 
+
+  // Create message id
+  // increment count
+  count++;
+  // create message id
+  char message_id[64];
+  snprintf(message_id, sizeof(message_id), "%s%d", username, count);
+  // add to our own seen set
+  for (int i=0; i<CAPACITY; i++){
+    seen[i] = strdup(message_id);
+  }
   // Valid message broadcast to network
-  broadcast(username, message);
+  broadcast(username, message, message_id);
 }
 
 int main(int argc, char** argv) {
@@ -138,7 +166,11 @@ int main(int argc, char** argv) {
 
     // Call reading thread
     pthread_t t;
-    pthread_create(&t, NULL, peer_read_thread, (void*)peer_fd);
+    // Create peer struct
+    peer* p = malloc(sizeof(*p));
+    p->peer_fd = peer_fd;
+    p->seen = seen;
+    pthread_create(&t, NULL, peer_read_thread, (void*)p);
   }
 
   // Set up the user interface. The input_callback function will be called

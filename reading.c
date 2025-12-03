@@ -8,8 +8,10 @@
 #include "socket.h"
 #include "ui.h"
 #include "p2pchat.h"
+#include "reading.h"
 
 #define MESSAGE_LEN 2048
+#define CAPACITY 1000
 
 // Helper function to all the required bytes
 size_t read_helper(int fd, void* buf, size_t len) {
@@ -32,20 +34,42 @@ size_t read_helper(int fd, void* buf, size_t len) {
 
 // Thread to read both username and message. Recieve lengths first and then contents
 void* peer_read_thread(void* arg) {
-  intptr_t peer_fd = (intptr_t) arg;
+  peer* p = (peer*) arg;
+  intptr_t peer_fd = p->peer_fd;
+  char** seen = p->seen;
 
   // Keep reading information from this peer
   while(1) {
 
     // Read the message id
-    if (read(peer_fd, &username_len, sizeof(size_t)) != sizeof(size_t)) {
+    size_t milen;
+    if (read(peer_fd, &milen, sizeof(size_t)) != sizeof(size_t)) {
       break; // Stop reading if there's an error
+    }
+    // Allocate memory for the message id
+    char *message_id = malloc(milen+1);
+    message_id[milen] = '\0';
+
+    // Read the message_id
+    read_helper(peer_fd, message_id, milen);
+
+    // Flag for if i should display/broadcast
+    int flag = 1;
+    // Check if in set
+    int i = 0;
+    while (seen[i] != NULL){
+      if (strcmp(seen[i], message_id) == 0) {
+        flag = 0;
+        break;
+      }
+      i++;
     }
 
     // Reading the username's length 
     size_t username_len;
     if (read(peer_fd, &username_len, sizeof(size_t)) != sizeof(size_t)) {
       break; // Stop reading if there's an error
+    }
 
     // Check if size is appropriate 
     if (username_len > MESSAGE_LEN) break;
@@ -69,14 +93,25 @@ void* peer_read_thread(void* arg) {
     // Read the full message
     read_helper(peer_fd, message, message_len);
     
-    ui_display(username, message);
+    // check flag
+    if (flag) {
+      ui_display(username, message);
+      /* Broadcast to all other peers */
+      broadcast(username, message, message_id);
 
-    /* Broadcast to all other peers */
-    broadcast(username, message);
+      // store message id
+      // find a free slot and store
+      for (int i = 0; i < CAPACITY; i++) {
+          if (seen[i] == NULL) {
+              seen[i] = strdup(message_id);  
+              break;
+          }
+      }
+    }
 
     free(username);
     free(message);
+    free(message_id);
   }
   return NULL;
-  }
 }
