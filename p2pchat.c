@@ -12,6 +12,7 @@
 
 #define CAPACITY 1000
 #define MESSAGE_LEN 2048
+
 pthread_mutex_t peers_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t seen_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -24,7 +25,7 @@ char* seen[CAPACITY];
 
 // List of peers
 intptr_t peers[CAPACITY];
-int num_peers=0;
+int num_peers = 0;
 
 // Broadcast message
 void broadcast(const char* username, const char* message, const char* message_id){
@@ -64,21 +65,27 @@ void broadcast(const char* username, const char* message, const char* message_id
 }
 
 // Thread for accepting incoming connection thread
-void* accept_thread(void* arg) {
-  intptr_t server_fd = (intptr_t) arg;
+void *accept_thread(void *arg)
+{
+  intptr_t server_fd = (intptr_t)arg;
   // Continuously accepting thread as long as the server is running
-  while(1) {
-    // Get the socket file descriptor 
+  while (1)
+  {
+    // Get the socket file descriptor
     intptr_t peer_fd = server_socket_accept(server_fd);
     // Skip if accept return an error
-    if (peer_fd < 0) continue;
-    
+    if (peer_fd < 0)
+      continue;
+
     // Add new peers to the global peer list
     pthread_mutex_lock(&peers_lock);
-    if (num_peers < CAPACITY) {
+    if (num_peers < CAPACITY)
+    {
       // store peers
       peers[num_peers++] = peer_fd;
-    } else {
+    }
+    else
+    {
       // too many peers
       close(peer_fd);
       pthread_mutex_unlock(&peers_lock);
@@ -98,10 +105,14 @@ void* accept_thread(void* arg) {
 }
 
 // This function is run whenever the user hits enter after typing a message
-void input_callback(const char* message) {
-  if (strcmp(message, ":quit") == 0 || strcmp(message, ":q") == 0) {
+void input_callback(const char *message)
+{
+  if (strcmp(message, ":quit") == 0 || strcmp(message, ":q") == 0)
+  {
     ui_exit();
-  } else {
+  }
+  else
+  {
     ui_display(username, message);
   } 
 
@@ -124,9 +135,11 @@ void input_callback(const char* message) {
   broadcast(username, message, message_id);
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
   // Make sure the arguments include a username
-  if (argc != 2 && argc != 4) {
+  if (argc != 2 && argc != 4)
+  {
     fprintf(stderr, "Usage: %s <username> [<peer> <port number>]\n", argv[0]);
     exit(1);
   }
@@ -137,7 +150,8 @@ int main(int argc, char** argv) {
   // TODO: Set up a server socket to accept incoming connections
   unsigned short port = 0;
   intptr_t server_socket_fd = server_socket_open(&port);
-  if (server_socket_fd == -1) {
+  if (server_socket_fd == -1)
+  {
     perror("Server socket was not opened");
     exit(EXIT_FAILURE);
   }
@@ -150,17 +164,18 @@ int main(int argc, char** argv) {
 
   // create thread to wait for connections
   pthread_t thread_id;
-  pthread_create(&thread_id, NULL, accept_thread, (void*) server_socket_fd);
+  pthread_create(&thread_id, NULL, accept_thread, (void *)server_socket_fd);
 
   // Did the user specify a peer we should connect to?
-  if (argc == 4) {
+  if (argc == 4)
+  {
     // Unpack arguments
-    char* peer_hostname = argv[2];
-    intptr_t peer_port = atoi(argv[3]);
-  
+    char *peer_hostname = argv[2];
+    unsigned short peer_port = atoi(argv[3]);
+
     // TODO: Connect to another peer in the chat network
-    intptr_t peer_fd;
-    if ((peer_fd = socket_connect(peer_hostname, peer_port)) == -1) {
+    if (socket_connect(peer_hostname, peer_port) == -1)
+    {
       perror("Connection fail");
       exit(EXIT_FAILURE);
     }
