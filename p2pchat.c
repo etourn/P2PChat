@@ -27,42 +27,45 @@ char* seen[CAPACITY];
 intptr_t peers[CAPACITY];
 int num_peers = 0;
 
-// Broadcast message
-void broadcast(const char* username, const char* message, const char* message_id){
+// broadcast message
+void broadcast(const char* username, const char* message, const char* message_id) {
+    size_t ulen = strlen(username);
+    size_t mlen = strlen(message);
+    size_t milen = strlen(message_id);
 
-  // get lengths of our data
-  size_t ulen = strlen(username);
-  size_t mlen = strlen(message);
-  size_t milen = strlen(message_id);
+    pthread_mutex_lock(&peers_lock);
 
-  // Write to all peers
-  for (int i = 0; i < num_peers; i++) {    
-    if (write_helper(peers[i], (char*) &milen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
-      fprintf(stderr, "Error transmitting over network\n");
-      break;
+    for (int i = 0; i < num_peers; ++i) {
+        intptr_t fd = peers[i];
+
+        // Send all fields. If any send fails, treat that peer as disconnected.
+        bool ok = true;
+        if (write_helper(fd, (char*)&milen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) ok = false;
+        if (ok && write_helper(fd, message_id, milen) != (ssize_t)milen) ok = false;
+        if (ok && write_helper(fd, (char*)&ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) ok = false;
+        if (ok && write_helper(fd, username, ulen) != (ssize_t)ulen) ok = false;
+        if (ok && write_helper(fd, (char*)&mlen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) ok = false;
+        if (ok && write_helper(fd, message, mlen) != (ssize_t)mlen) ok = false;
+
+        if (!ok) {
+            // Peer disconnected or had an error. Remove it from list.
+            close(fd);
+
+            // shift left
+            for (int j = i; j < num_peers - 1; ++j) {
+                peers[j] = peers[j + 1];
+            }
+            num_peers--;
+
+            // we've moved a new peer into index i; process this index again
+            i--;
+            continue;
+        }
     }
-    if (write_helper(peers[i], message_id, milen) != (ssize_t)milen) {
-      fprintf(stderr, "Error transmitting over network\n");
-      break;
-    }
-    if (write_helper(peers[i], (char*) &ulen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
-      fprintf(stderr, "Error transmitting over network\n");
-      break;
-    }
-    if (write_helper(peers[i], username, ulen) != (ssize_t)ulen) {
-      fprintf(stderr, "Error transmitting over network\n");
-      break;
-    }
-    if (write_helper(peers[i], (char*) &mlen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) {
-      fprintf(stderr, "Error transmitting over network\n");
-      break;
-    }
-    if (write_helper(peers[i], message, mlen) != (ssize_t)mlen) {
-      fprintf(stderr, "Error transmitting over network\n");
-      break;
-    }
-  }
+
+    pthread_mutex_unlock(&peers_lock);
 }
+
 
 // Thread for accepting incoming connection thread
 void *accept_thread(void *arg)
@@ -110,34 +113,37 @@ void input_callback(const char *message)
   if (strcmp(message, ":quit") == 0 || strcmp(message, ":q") == 0)
   {
     ui_exit();
+    return;   // do NOT broadcast anything or modify seen
   }
-  else
-  {
-    ui_display(username, message);
-  } 
+
+  // display locally
+  ui_display(username, message);
 
   // Create message id
-  // increment count
   count++;
-  // create message id
   char message_id[64];
   snprintf(message_id, sizeof(message_id), "%s%d", username, count);
+
   // add to our own seen set
   pthread_mutex_lock(&seen_lock);
   for (int i=0; i<CAPACITY; i++){
     if (seen[i] == NULL) {
-      // cite: https://man7.org/linux/man-pages/man3/strdup.3.html
-      seen[i] = strdup(message_id);  
+      seen[i] = strdup(message_id);
       break;
     }
   }
   pthread_mutex_unlock(&seen_lock);
-  // Valid message broadcast to network
+
+  // Broadcast the message
   broadcast(username, message, message_id);
 }
 
 int main(int argc, char **argv)
 {
+    // prevent a closed socket from killing the entire program
+    // cite: https://man7.org/linux/man-pages/man7/signal.7.html 
+    signal(SIGPIPE, SIG_IGN);
+
   // Make sure the arguments include a username
   if (argc != 2 && argc != 4)
   {
