@@ -2,35 +2,39 @@ Once you have completed your implementation, review and respond to the questions
 
 ----- Question 1 -----
 
-What kinds of faults can your peer-to-peer chat implementation tolerate? Faults may include problems with machines or the network, as well as program crashes. 
-Be specific about what failure situations you could tolerate, and explain how the system can continue to work in the face of these failures.
+What kinds of faults can your peer-to-peer chat implementation tolerate? Faults
+may include problems with machines or the network, as well as program crashes. 
+Be specific about what failure situations you could tolerate, and explain how
+the system can continue to work in the face of these failures.
 
 ---- Response ----
-- Our implementation handle individual peer disconnections due to a peer process crash or a peer force-quits. If a peer became unstable, our program, specifically the broascast() function, will dectect the failed write and remove the peer from the global list. Through this the rest of the chat network keeps functioning normally and only the dead peer stops receiving messages.
-- Furthermore, we handle the duplicate braodcast loops by using the seen set. If the same message shows up again due to re-broadcasting loops or peers rejoining, peer_read_thread will detect the message ID and not re-broadcast. 
 
+- Our implementation can tolerate several types of faults, especially those involving peer disconnections and communication failtures. For example, if a peer process crashes, force-quits, or loses network connectivity, our broadcast() function detects the failed write and removes that peer from the global peer list. This ensure that the remaining peers can continue exchanging messages normally. The rest of the chat network remains unaffected, and only the disconnected peer stops receiving updates.
+- Additionally, our implementation can tolerate rebroadcast loops caused by messages circulating through the networ multiple times. The seen[] array allows the system to detect repeated message IDs and ignore them. This encures that if peers reconnect or if messages take different paths in the networ, the system does not stuck in an infinite loop of repeated broadcasts. 
 
 ---- Question 2 ----
 
 What faults will cause your peer-to-peer chat to fail, or to operate in some diminished capacity? Again, be specific about the situations that will result in failure.
 
 ---- Response ----
-- We hard coded the capacity to 1000, so the if the user or network sends more than 1000 messages, the new IDs cannot be stored, which lead the system to collapse. Furthermore, if more than 1000 peers connect, the network becomes partitioned and those peer will never join the chat. 
-- We keeps seen[], peers[], and message counter in memory, so if the program crashes or restrats, it will lose access to those information. Consequently, it will re-broadcases message incorrectly and the network structure is broken. 
-
+- One majot limitation is the fixed capacity of 1000 entries for both seen[] and peers[]. If the system processes more than 1000 unique messages, it can no longer store new message IDs, which may cause duplicate detection to fail and eventually lead to broadcast loops. Similarly, if more than 1000 peers try to connect, the system becomes partitioned and additional peers cannot join the chat. 
+- We keeps system state, such as seen set, peer list, and message counter, in the memory. If the program crashes or restarts, all this information is lost. This means the peer will re-join the network without knowing which message it has already processed, leading to incorrect rebroadcast. Consequently, this could allow old messages to recirculate and disrupt the chat.
 
 ---- Question 3 ----
 
 One mechanism for tolerating failure is replication. If each client connected to two existing peers instead of just one, would that help you tolerate any additional faults? What problems could this change create for your implementation?
 
----- Response ----
-Yes. It will reduce the chance of becoming isolated. A peer can survive after losing one peer connection or temporary network issue, as it's still connected to another peer. However, our message loop won't be compatible with such structure. Currently, each peer are connected like a directed graph; thus, if every node connects to two peers, duplicate detection will break and messages will be rebroadcast. Furthermore, it will also increase CPU load, as doubling peers means doubling threads, so nodes with many peers may slow down or drop connection.   
+---- Response ----   
 
+Yes. It will improves resilience against network partitioning due to one peer becomes unreachable or disconnects unexpectedly, a client with a second connection can still forward and recieve message through the alternative path. This redundancy increases the likelihood that every node remains part of the communication network even during failures. It also improves message reliability because dta can take more than one route to its destination. 
+However, with two connections per peer, the network becomes more complex. Therefore, the design will increase the chance that the same message arrives multiple times through different paths. Our current duplicate detection system, based on a hard-coded array, may not scale or respond quickly enough, and overflow faster. Additionally, a node connected to twice as many peers must double the number of threads, increasing CPU load and memory use. On a busy network, this could slow down the execution or lead the program to corrupt. Thus, while redundancy improves fault tolerance, it also make performance and message management more complicated. 
 
 ---- Question 4 ----
 
 Describe one additional change you could make to the peer-to-peer chat system that would allow it to tolerate faults. Describe how you would implement this change, and at least one example of how it would allow you to tolerate a fault.
 
 ---- Response ----
+A change that could improve fault tolerance is saving the message log so that each peer can recover its state after a crash or restart. Currently, all of our critical state exists only in memory. By writing each processed message ID to a file or database on disk, the peer could reload this information when the program restarts. 
 
+To implement this, we could save each message ID to a text file every time we add it to the seen[] array. Once the program first run, it would read the file into memory before joining the network. This way, the system can tolerate a peer crashing, or disconnecting with losing its entire message history. For example, if a user closes their laptop and reopens it, their peer would restart with the correct seen data, allowing it to rejoin the network safely without disrupting other peers. 
 
