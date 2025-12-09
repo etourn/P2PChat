@@ -117,5 +117,6 @@ void* peer_read_thread(void* arg) {
     free(message);
     free(message_id);
   }
+  free(p);
   return NULL;
 }

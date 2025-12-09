@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "socket.h"
 #include "writing.h"
@@ -20,14 +21,14 @@ pthread_mutex_t seen_lock = PTHREAD_MUTEX_INITIALIZER;
 const char* username;
 // keep a count of messages sent for id
 int count = 0;
-// seen array
+// keep track of processed message
 char* seen[CAPACITY]; 
 
 // List of peers
 intptr_t peers[CAPACITY];
 int num_peers = 0;
 
-// broadcast message
+// Function to forwards a message from the local user to all other connected peers
 void broadcast(const char* username, const char* message, const char* message_id) {
     size_t ulen = strlen(username);
     size_t mlen = strlen(message);
@@ -38,7 +39,7 @@ void broadcast(const char* username, const char* message, const char* message_id
     for (int i = 0; i < num_peers; ++i) {
         intptr_t fd = peers[i];
 
-        // Send all fields. If any send fails, treat that peer as disconnected.
+        // Send all fields. If any send fails, treat that peer as disconnected
         bool ok = true;
         if (write_helper(fd, (char*)&milen, sizeof(size_t)) != (ssize_t)sizeof(size_t)) ok = false;
         if (ok && write_helper(fd, message_id, milen) != (ssize_t)milen) ok = false;
@@ -48,7 +49,7 @@ void broadcast(const char* username, const char* message, const char* message_id
         if (ok && write_helper(fd, message, mlen) != (ssize_t)mlen) ok = false;
 
         if (!ok) {
-            // Peer disconnected or had an error. Remove it from list.
+            // Peer disconnected or had an error. Remove it from list
             close(fd);
 
             // shift left
@@ -96,7 +97,7 @@ void *accept_thread(void *arg)
     }
     pthread_mutex_unlock(&peers_lock);
 
-    // Create a read thread for each peer
+    // create a read thread for each peer
     pthread_t t;
     // create struct peer to pass in args
     peer* p = malloc(sizeof(*p));
@@ -113,15 +114,16 @@ void input_callback(const char *message)
   if (strcmp(message, ":quit") == 0 || strcmp(message, ":q") == 0)
   {
     ui_exit();
-    return;   // do NOT broadcast anything or modify seen
+    return;   // do not broadcast anything or modify seen
   }
 
   // display locally
   ui_display(username, message);
 
-  // Create message id
+  // create message id
   count++;
   char message_id[64];
+  // Cite: https://man7.org/linux/man-pages/man3/snprintf.3.html
   snprintf(message_id, sizeof(message_id), "%s%d", username, count);
 
   // add to our own seen set
@@ -136,6 +138,18 @@ void input_callback(const char *message)
 
   // Broadcast the message
   broadcast(username, message, message_id);
+}
+
+// Function to free all strdup'ed strings in seen[]
+void free_seen(char* seen[]) {
+  pthread_mutex_lock(&seen_lock);
+  for (int i = 0; i < CAPACITY; i++) {
+    if (seen[i] != NULL) {
+      free(seen[i]);
+      seen[i] = NULL;
+    }
+  }
+  pthread_mutex_unlock(&seen_lock);
 }
 
 int main(int argc, char **argv)
@@ -154,7 +168,7 @@ int main(int argc, char **argv)
   // Save the username in a global
   username = argv[1];
 
-  // TODO: Set up a server socket to accept incoming connections
+  // Set up a server socket to accept incoming connections
   unsigned short port = 0;
   intptr_t server_socket_fd = server_socket_open(&port);
   if (server_socket_fd == -1)
@@ -174,14 +188,14 @@ int main(int argc, char **argv)
   pthread_t thread_id;
   pthread_create(&thread_id, NULL, accept_thread, (void *)server_socket_fd);
 
-  // Did the user specify a peer we should connect to?
+  // The user trying to connect to a peer
   if (argc == 4)
   {
     // Unpack arguments
     char *peer_hostname = argv[2];
     unsigned short peer_port = atoi(argv[3]);
 
-    // TODO: Connect to another peer in the chat network
+    // Connect to another peer in the chat network
     intptr_t peer_fd;
     if ((peer_fd = socket_connect(peer_hostname, peer_port)) == -1)
     {
@@ -207,16 +221,18 @@ int main(int argc, char **argv)
   // each time the user hits enter to send a message.
   ui_init(input_callback);
 
+  // Once the UI is running, you can use it to display log messages
+  ui_display("INFO", "This is a handy log message.");
+
   // Display the port the server is listening on
   char port_msg[64];
   snprintf(port_msg, sizeof(port_msg), "Listening on port %d", port);
   ui_display("INFO", port_msg);
 
-  // Once the UI is running, you can use it to display log messages
-  ui_display("INFO", "This is a handy log message.");
-
   // Run the UI loop. This function only returns once we call ui_stop() somewhere in the program.
   ui_run();
 
+  // Free before program exits:
+  free_seen(seen);
   return 0;
 }
