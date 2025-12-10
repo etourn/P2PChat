@@ -10,7 +10,8 @@ the system can continue to work in the face of these failures.
 ---- Response ----
 
 - Our implementation can tolerate several types of faults, especially those involving peer disconnections and communication failtures. For example, if a peer process crashes, force-quits, or loses network connectivity, our broadcast() function detects the failed write and removes that peer from the global peer list. This ensure that the remaining peers can continue exchanging messages normally. The rest of the chat network remains unaffected, and only the disconnected peer stops receiving updates.
-- Additionally, our implementation can tolerate rebroadcast loops caused by messages circulating through the networ multiple times. The seen[] array allows the system to detect repeated message IDs and ignore them. This encures that if peers reconnect or if messages take different paths in the networ, the system does not stuck in an infinite loop of repeated broadcasts. 
+- We also ignore the SIG_PIPE singal so that it returns -1 on failure, allowing us to handle errors without killing our process.
+- Additionally, our implementation can tolerate rebroadcast loops caused by messages circulating through the network multiple times. The seen[] array allows the system to detect repeated message IDs and ignore them. This encures that if peers reconnect or if messages take different paths in the networ, the system does not stuck in an infinite loop of repeated broadcasts. 
 
 ---- Question 2 ----
 
